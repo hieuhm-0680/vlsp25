@@ -161,3 +161,94 @@ python jina_reranker.py
 # 5. Execute graph-based retrieval
 python query_script.py
 ```
+
+## Subtask 2 - Visual Question Answering (VQA)
+
+### Overview
+
+Our approach to Subtask 2 adopts a three-stage pipeline—**Image Conditioning**, **Law Context Extraction**, and **Reasoning & Answer Selection**—to answer traffic-law questions given three inputs: a **question**, a set of **answer choices** (multiple-choice or True/False), and the **image attached to the question**. The pipeline (i) prepares visual inputs for clearer sign understanding, (ii) assembles a focused legal context from retrieved articles, and (iii) applies a vision-language reasoner to select the final answer with step-by-step prompting.
+
+### System Architecture
+
+The VQA pipeline consists of three main components:
+
+1. **Image Conditioning**
+2. **Law Context Extraction**
+3. **Reasoning & Answer Selection**
+
+---
+
+## 1. Image Conditioning
+
+### 1.1 Law Image Consolidation
+
+For each relevant article (from Subtask 1 retrieval), all associated law images are collected and merged into a single composite image per article. This reduces multi-image prompt complexity and shortens context length, which helps mitigate hallucination and repetitive outputs during inference.
+
+### 1.2 Question Image Preprocessing
+
+For each question image (the image attached to the question), **Grounding DINO** is used to detect traffic-sign regions. Detected bounding boxes are drawn on the original image to visually highlight target signs in complex scenes, providing clearer attention anchors for downstream models.
+
+---
+
+## 2. Law Context Extraction
+
+### 2.1 Inputs
+
+- **Question text**
+- **Annotated question image** (from §1.2)
+- **Law text** (relevant article(s) from Subtask 1)
+- **Merged law image** (from §1.1)
+
+### 2.2 Inference Configuration
+
+- **Model:** `unsloth/Qwen2.5-VL-7B-Instruct-unsloth-bnb-4bit` (vision-language)
+- **Prompting:** Chain-of-thought–style prompts to encourage structured extraction of only information relevant to the given image and question.
+- **Heuristic:** Questions whose relevant articles contain **no** law image are skipped at this stage (empirically reduced noise and improved downstream reasoning).
+
+### 2.3 Procedure
+
+The model receives the inputs above and is instructed to extract a minimal, faithful legal context tied to the visual evidence. The goal is not to answer the question here, but to produce a compact knowledge slice for the reasoning stage.
+
+### 2.4 Output Schema
+
+- **Detected sign names**
+- **Law details per sign**
+- **Concise conclusion summary**
+
+### 2.5 Design Choices & Assumptions
+
+- Answer choices are **not** provided at this stage to avoid bias; the model focuses on extraction rather than early answer selection.
+- Articles can contain multiple signs and extraneous text; targeted extraction reduces irrelevant content before reasoning.
+
+---
+
+## 3. Reasoning & Answer Selection
+
+### 3.1 Inputs
+
+- **Question text**
+- **Answer choices** (multiple-choice or True/False)
+- **Annotated question image**
+- **Extracted law context** (from §2)
+
+### 3.2 Inference Configuration
+
+- **Primary models:**
+
+  - `unsloth/Qwen2.5-VL-7B-Instruct-unsloth-bnb-4bit`
+  - `OpenGVLab/InternVL3-8B`
+- **Prompting:** Chain-of-thought–style (“think step by step”) to reason strictly over the extracted law context.
+- **Efficiency note:** Law images are **not** re-injected here to keep context concise and reduce hallucinations; the curated law text serves as the authoritative source.
+
+### 3.3 Outputs
+
+- **Reasoning trace** (structured rationale grounded in extracted law)
+- **Final selected choice** (from the provided answer choices)
+
+---
+
+## 4. Submissions
+
+- **Submission 1:** Qwen2.5-VL-7B-Instruct (unsloth, 4-bit) as the reasoner
+- **Submission 2:** InternVL3-8B as the reasoner
+- **Submission 3:** Stacked ensemble of QwenVL and InternVL final choices
