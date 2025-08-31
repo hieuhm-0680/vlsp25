@@ -156,7 +156,7 @@ python src/heterogeneous_graph_builder.py
 # Check the CLIP_Extract.ipynb notebook for details
 
 # 4. Process queries with reranking
-python jina_reranker.py
+python visual_reranking.py
 
 # 5. Execute graph-based retrieval
 python query_script.py
