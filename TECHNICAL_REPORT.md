@@ -96,7 +96,7 @@ For each input question, we first determine traffic sign relevance using **Jina 
 
 1. Get all cropped images from the question image (processed by Grounding DINO in step 1.1)
 2. Apply multimodal reranking with image-text pairs: `[image, "Câu hỏi: {question}\n\nTài liệu liên quan: {context}"]`
-3. Sort by score and filter crops based on relevance scores, keeping those that have a score difference of no more than `threshold=0.005`
+3. Sort by score and filter crops based on relevance scores, keeping those that have a score difference of no more than `threshold=0.05`
 4. Identify `n_cropped` relevant traffic signs
 
 ### 3.2 Similarity Search & Graph Traversal
